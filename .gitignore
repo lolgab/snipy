@@ -1,0 +1,5 @@
+target/
+.*/
+.directory
+project/target
+project/project
