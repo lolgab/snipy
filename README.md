@@ -9,9 +9,10 @@ import snipy._         // import to enable snipy implicits
 import snipy.dynamic._ // enables dynamic interface
 
 object Main {
-  def main(args: Array[String]): Unit = PyZone { implicit z => // You need to wrap Python call in a PyZone
-                                                               // when zone block ends every PyObject is
-                                                               // no more usable
+  def main(args: Array[String]): Unit = PyZone { implicit z =>
+    // You need to wrap Python call in a PyZone
+    // when zone block ends every PyObject is
+    // no more usable
     val math = module("math")  // equals to python's "import math"
     val res = math.log10(2.0)  // calls dynamically the log10 function passing a Double converted to PyObject
     println(res)               // calls the "str" python function as toString.
@@ -52,10 +53,13 @@ val pythonLib = module("pythonLib")(PyZone.leakingZone)
 ```
 now you can define a Scala function for every python function you need:
 ```scala
-def pyFunction(foo: String): List[Int] = PyZone { implicit z =>  // You can define a local PyZone because you don't
-                                                                 // need the intermediate Python Objects (result is a scala type)
-  Dyn(pythonLib).pyFunction(foo.asPython).as[PyList[Int]].asScala // the as method casts to a specific python type
-}                                                                 // so .asScala can call the correct typeclass instance
+def pyFunction(foo: String): List[Int] = PyZone { implicit z =>  
+  // You can define a local PyZone because you don't
+  // need the intermediate Python Objects (result is a scala type)
+  Dyn(pythonLib).pyFunction(foo.asPython).as[PyList[PyLong]].asScala
+  // the as method casts to a specific python type 
+  // so .asScala can call the correct typeclass instance
+}
 ```
 
 Then for every class you have to define an implicit class:
