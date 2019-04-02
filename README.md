@@ -30,6 +30,12 @@ object Main {
 }
 ```
 
+## Giter8 template
+You can use the giter8 template to create an empty project:
+```scala
+sbt new lolgab/snipy.g8
+```
+
 ## How it works
 The conversions are managed by two typeclasses:
 ```scala
