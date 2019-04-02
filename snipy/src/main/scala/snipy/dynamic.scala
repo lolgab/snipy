@@ -4,14 +4,12 @@ import snipy.facades.builtins
 import snipy.CApi._
 
 import scala.language.dynamics
+import scala.language.implicitConversions
 import scala.scalanative.native._
 
 object dynamic {
   def module(name: String)(implicit z: PyZone): Dyn =
     Dyn(PyImport_Import(name.asPython))
-
-  implicit def tToDynPyObject[T](t: T)(implicit zone: PyZone, asPython: AsPython[T, PyObject]): Dyn =
-    asPython.asPython(t)
 
   implicit def dynPyObjectToPyObject(dyn: Dyn): PyObject = dyn.o
 

@@ -17,7 +17,7 @@ object Qt {
   }
 
   def QLabel(title: String)(implicit z: PyZone): QLabel =
-    QWidgets.QLabel(title).as[QLabel]
+    QWidgets.QLabel(title.asPython).as[QLabel]
 
   implicit class QLabelOps(val l: QLabel) extends AnyVal {
     def show()(implicit z: PyZone): Unit = Dyn(l).show()

@@ -7,6 +7,6 @@ object math {
   private val math = module("math")(PyZone.leakingZone)
 
   def log(d: Double): Double = PyZone { implicit z =>
-    math.log(d).as[PyFloat].asScala
+    math.log(d.asPython).as[PyFloat].asScala
   }
 }
