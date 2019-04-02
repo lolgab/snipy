@@ -7,11 +7,6 @@ import scala.language.dynamics
 import scala.scalanative.native._
 
 object dynamic {
-  final class NamedParameter(val name: String, val value: PyObject)
-  object NamedParameter {
-    def apply(name: String, value: PyObject): NamedParameter = new NamedParameter(name, value)
-  }
-
   def module(name: String)(implicit z: PyZone): Dyn =
     Dyn(PyImport_Import(name.asPython))
 
@@ -40,11 +35,20 @@ object dynamic {
       Dyn(PyObject_CallObject(func, tuple))
     }
 
-    def apply(name: String, args: NamedParameter*)(implicit z: PyZone): Dyn = {
+    def applyDynamicNamed(name: String)(args: (String, Dyn)*)(implicit z: PyZone): Dyn = {
       val func = selectDynamic(name)
+      val argsNum = args.count(_._1.isEmpty)
       val kwargs = PyDict_New()
-      for(arg <- args) PyDict_SetItem(kwargs, arg.name.asPython, arg.value)
-      Dyn(PyObject_Call(func, PyNone, kwargs))
+      val argsTuple = if(argsNum == 0) PyNone else PyTuple_New(argsNum)
+      var argsTupleIndex = 0
+      for((name, value) <- args)
+        if(name.isEmpty) {
+          PyTuple_SetItem(argsTuple, argsTupleIndex, value)
+          argsTupleIndex = argsTupleIndex + 1
+        }
+        else
+          PyDict_SetItem(kwargs, name.asPython, value)
+      Dyn(PyObject_Call(func, argsTuple, kwargs))
     }
 
     def +(other: PyObject)(implicit z: PyZone): Dyn = Dyn(o).__add__(other)

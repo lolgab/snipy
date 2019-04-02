@@ -21,7 +21,7 @@ object wx {
   def App()(implicit z: PyZone): App = wx.App().as[App]
 
   def Frame(title: String)(implicit z: PyZone): Frame =
-    wx("Frame", NamedParameter("title", title.asPython)).as[Frame]
+    Dyn(wx).Frame(title = title.asPython).as[Frame]
 
   implicit class AppOps(val app: App) extends AnyVal {
     def MainLoop(): Unit = PyZone { implicit z =>
