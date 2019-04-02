@@ -7,8 +7,9 @@ It interfaces directly with [Python C Api](https://docs.python.org/3.7/c-api/ind
 Add the following to your [Scala Native Project](https://scala-native.readthedocs.io/en/v0.3.8/user/sbt.html):
 
 ```scala
-libraryDependencies += "com.github.lolgab" %%% "snipy" % "0.0.1"
+import scala.sys.process._
 nativeLinkingOptions ++= "python3-config --ldflags".!!.split(' ').filter(_.nonEmpty).map(_.trim).toSeq
+libraryDependencies += "com.github.lolgab" %%% "snipy" % "0.0.1"
 ```
 
 then you can call your first Python function :)
