@@ -1,7 +1,7 @@
 import scala.sys.process._
 
 val commonSettings = Seq(
-  version := "0.0.2",
+  version := "0.0.3-SNAPSHOT",
   organization := "com.github.lolgab",
   scalaVersion := "2.11.12",
   nativeLinkingOptions ++= "python3-config --ldflags".!!.split(' ').filter(_.nonEmpty).map(_.trim).toSeq,
