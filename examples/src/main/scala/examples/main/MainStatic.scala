@@ -1,7 +1,8 @@
-package main
+package examples.main
 
 import snipy._
-import snipy.facades.{builtins, numpy => np}
+import snipy.facades.builtins
+import examples.facades.{numpy => np}
 
 object MainStatic {
   def main(args: Array[String]): Unit = PyZone { implicit z =>

@@ -1,7 +1,7 @@
-package main
+package examples.main
 
 import snipy._
-import snipy.facades.wx
+import examples.facades.wx
 
 object Main {
   def main(args: Array[String]): Unit = PyZone { implicit z =>

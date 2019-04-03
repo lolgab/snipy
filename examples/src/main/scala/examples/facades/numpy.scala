@@ -1,4 +1,4 @@
-package snipy.facades
+package examples.facades
 
 import snipy._
 import snipy.dynamic._
@@ -12,7 +12,7 @@ object numpy {
   private val np = module("numpy")(PyZone.leakingZone)
 
   def array[T](lists: T)(implicit z: PyZone, asPython: AsPython[T, PyListAny]): ndarray =
-    np.array(lists.asPython).as[ndarray]
+    np.array(lists).as[ndarray]
 
   def log10(array: ndarray)(implicit z: PyZone): ndarray = {
     np.log10(array).as[ndarray]

@@ -13,6 +13,8 @@ object dynamic {
 
   implicit def dynPyObjectToPyObject(dyn: Dyn): PyObject = dyn.o
 
+  implicit def tToPyObject[T](t: T)(implicit z: PyZone, asPy: AsPython[T, PyObject]): Dyn = asPy.asPython(t)
+
   implicit class Dyn(val o: PyObject) extends AnyVal with Dynamic {
     def selectDynamic(attr: String)(implicit z: PyZone): Dyn = {
       val s = stackalloc[Byte](attr.getBytes().length + 1)
@@ -23,7 +25,7 @@ object dynamic {
     }
 
     def applyDynamic(name: String)(args: Dyn*)(implicit z: PyZone): Dyn = {
-      val func = o.selectDynamic(name)
+      val func = selectDynamic(name)
       var i: Int = 0
       val tuple = PyTuple_New(args.length)
       args.foreach { arg =>
@@ -62,21 +64,22 @@ object dynamic {
     def &(other: PyObject)(implicit z: PyZone): Dyn = Dyn(o).__and__(other)
     def |(other: PyObject)(implicit z: PyZone): Dyn = Dyn(o).__or__(other)
     def ^(other: PyObject)(implicit z: PyZone): Dyn = Dyn(o).__xor__(other)
-    def +=(other: PyObject)(implicit z: PyZone): Dyn = Dyn(o).__iadd__(other)
-    def -=(other: PyObject)(implicit z: PyZone): Dyn = Dyn(o).__isub__(other)
-    def *=(other: PyObject)(implicit z: PyZone): Dyn = Dyn(o).__imul__(other)
-    def `//=`(other: PyObject)(implicit z: PyZone): Dyn = Dyn(o).__ifloordiv__(other)
-    def /=(other: PyObject)(implicit z: PyZone): Dyn = Dyn(o).__idiv__(other)
-    def %=(other: PyObject)(implicit z: PyZone): Dyn = Dyn(o).__imod__(other)
-    def divmod_=(other: PyObject)(implicit z: PyZone): Dyn = Dyn(o).__idivmod__(other)
-    def **=(other: PyObject)(implicit z: PyZone): Dyn = Dyn(o).__ipow__(other)
-    def <<=(other: PyObject)(implicit z: PyZone): Dyn = Dyn(o).__ilshift__(other)
-    def >>=(other: PyObject)(implicit z: PyZone): Dyn = Dyn(o).__irshift__(other)
-    def &=(other: PyObject)(implicit z: PyZone): Dyn = Dyn(o).__iand__(other)
-    def |=(other: PyObject)(implicit z: PyZone): Dyn = Dyn(o).__ior__(other)
-    def ^=(other: PyObject)(implicit z: PyZone): Dyn = Dyn(o).__ixor__(other)
+    // def +=(other: PyObject)(implicit z: PyZone): Dyn = Dyn(o).__iadd__(other)
+    // def -=(other: PyObject)(implicit z: PyZone): Dyn = Dyn(o).__isub__(other)
+    // def *=(other: PyObject)(implicit z: PyZone): Dyn = Dyn(o).__imul__(other)
+    // def `//=`(other: PyObject)(implicit z: PyZone): Dyn = Dyn(o).__ifloordiv__(other)
+    // def /=(other: PyObject)(implicit z: PyZone): Dyn = Dyn(o).__idiv__(other)
+    // def %=(other: PyObject)(implicit z: PyZone): Dyn = Dyn(o).__imod__(other)
+    // def divmod_=(other: PyObject)(implicit z: PyZone): Dyn = Dyn(o).__idivmod__(other)
+    // def **=(other: PyObject)(implicit z: PyZone): Dyn = Dyn(o).__ipow__(other)
+    // def <<=(other: PyObject)(implicit z: PyZone): Dyn = Dyn(o).__ilshift__(other)
+    // def >>=(other: PyObject)(implicit z: PyZone): Dyn = Dyn(o).__irshift__(other)
+    // def &=(other: PyObject)(implicit z: PyZone): Dyn = Dyn(o).__iand__(other)
+    // def |=(other: PyObject)(implicit z: PyZone): Dyn = Dyn(o).__ior__(other)
+    // def ^=(other: PyObject)(implicit z: PyZone): Dyn = Dyn(o).__ixor__(other)
 
-    def as[T <: Ptr[Byte]]: T = o.asInstanceOf[T]
+    def as[U <: Ptr[Byte]]: U = o.asInstanceOf[U]
+    def as[U <: PyObject, T](implicit asSc: AsScala[U, T]): T = o.asInstanceOf[U].asScala[T]
 
     override def toString: String = builtins.str(o)
   }

@@ -1,4 +1,4 @@
-package snipy.facades
+package examples.facades
 
 import snipy.dynamic._
 import snipy._
@@ -17,7 +17,7 @@ object Qt {
   }
 
   def QLabel(title: String)(implicit z: PyZone): QLabel =
-    QWidgets.QLabel(title.asPython).as[QLabel]
+    QWidgets.QLabel(title).as[QLabel]
 
   implicit class QLabelOps(val l: QLabel) extends AnyVal {
     def show()(implicit z: PyZone): Unit = Dyn(l).show()
@@ -27,20 +27,3 @@ object Qt {
     def exec_()(implicit z: PyZone): Unit = Dyn(app).exec_()
   }
 }
-
-//  private val QWidgets = module("PyQt5.QtWidgets")(PyZone.leakingZone)
-//
-//  def QApplication()(implicit z: PyZone): QApplication = {
-//    QWidgets("QApplication", PyList.empty).asInstanceOf[QApplication]
-//  }
-//
-//  def QLabel(title: String)(implicit z: PyZone): QLabel =
-//    QWidgets("QLabel", title).asInstanceOf[QLabel]
-//
-//  implicit class QLabelOps(val l: QLabel) extends AnyVal {
-//    def show()(implicit z: PyZone): Unit = l("show")
-//  }
-//
-//  implicit class QApplicationOps(val app: QApplication) extends AnyVal {
-//    def exec_()(implicit z: PyZone): Unit = app("exec_")
-//  }

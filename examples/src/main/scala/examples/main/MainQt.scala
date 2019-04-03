@@ -1,7 +1,7 @@
-package main
+package examples.main
 
 import snipy._
-import snipy.facades.Qt._
+import examples.facades.Qt._
 
 object MainQt {
   def main(args: Array[String]): Unit = PyZone { implicit z =>
