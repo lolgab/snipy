@@ -24,8 +24,8 @@ object dynamic {
       Dyn(PyObject_GetAttrString(o, toCString(attr)(zone)))
     }
 
-    def applyDynamic(name: String)(args: Dyn*)(implicit z: PyZone): Dyn = {
-      val func = selectDynamic(name)
+    def applyDynamic(name: String)(args: Dyn*)(implicit z: PyZone): Dyn = PyZone { implicit innerZone =>
+      val func = selectDynamic(name)(innerZone)
       val res = args.length match {
         case 0 =>
           z.manage(Unmanaged.PyObject_CallFunctionObjArgs(func, 0))
@@ -51,21 +51,21 @@ object dynamic {
           z.manage(Unmanaged.PyObject_CallFunctionObjArgs(func, args(0).o, args(1).o, args(2).o, args(3).o, args(4).o, args(5).o, args(6).o, args(7).o, args(8).o, args(9).o, 0))
         case _ =>
           var i: Int = 0
-          val tuple = PyTuple_New(args.length)
+          val tuple = PyTuple_New(args.length)(innerZone)
           args.foreach { arg =>
             PyTuple_SetItem(tuple, i, arg.o)
             i = i + 1
           }
-          PyObject_CallObject(func, tuple)
+          PyObject_CallObject(func, tuple)(z)
       }
       Dyn(res)
     }
 
-    def applyDynamicNamed(name: String)(args: (String, Dyn)*)(implicit z: PyZone): Dyn = {
-      val func = selectDynamic(name)
+    def applyDynamicNamed(name: String)(args: (String, Dyn)*)(implicit z: PyZone): Dyn = PyZone { implicit innerZone =>
+      val func = selectDynamic(name)(innerZone)
       val argsNum = args.count(_._1.isEmpty)
-      val kwargs = PyDict_New()
-      val argsTuple = if(argsNum == 0) PyNone else PyTuple_New(argsNum)
+      val kwargs = PyDict_New()(innerZone)
+      val argsTuple = if(argsNum == 0) PyNone(innerZone) else PyTuple_New(argsNum)(innerZone)
       var argsTupleIndex = 0
       for((name, value) <- args)
         if(name.isEmpty) {
@@ -73,8 +73,8 @@ object dynamic {
           argsTupleIndex = argsTupleIndex + 1
         }
         else
-          PyDict_SetItem(kwargs, name.asPython, value)
-      Dyn(PyObject_Call(func, argsTuple, kwargs))
+          PyDict_SetItem(kwargs, name.asPython(implicitly, innerZone), value)
+      Dyn(PyObject_Call(func, argsTuple, kwargs)(z))
     }
 
     def +(other: PyObject)(implicit z: PyZone): Dyn = Dyn(o).__add__(other)
