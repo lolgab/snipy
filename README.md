@@ -9,7 +9,7 @@ Add the following to your [Scala Native Project](https://scala-native.readthedoc
 ```scala
 import scala.sys.process._
 nativeLinkingOptions ++= "python3-config --ldflags".!!.split(' ').filter(_.nonEmpty).map(_.trim).toSeq
-libraryDependencies += "com.github.lolgab" %%% "snipy" % "0.0.1"
+libraryDependencies += "com.github.lolgab" %%% "snipy" % "0.0.2"
 ```
 
 then you can call your first Python function :)
