@@ -26,13 +26,39 @@ object dynamic {
 
     def applyDynamic(name: String)(args: Dyn*)(implicit z: PyZone): Dyn = {
       val func = selectDynamic(name)
-      var i: Int = 0
-      val tuple = PyTuple_New(args.length)
-      args.foreach { arg =>
-          PyTuple_SetItem(tuple, i, arg.o)
-          i = i + 1
+      val res = args.length match {
+        case 0 =>
+          z.manage(Unmanaged.PyObject_CallFunctionObjArgs(func, 0))
+        case 1 =>
+          z.manage(Unmanaged.PyObject_CallFunctionObjArgs(func, args(0).o, 0))
+        case 2 =>
+          z.manage(Unmanaged.PyObject_CallFunctionObjArgs(func, args(0).o, args(1).o, 0))
+        case 3 =>
+          z.manage(Unmanaged.PyObject_CallFunctionObjArgs(func, args(0).o, args(1).o, args(2).o, 0))
+        case 4 =>
+          z.manage(Unmanaged.PyObject_CallFunctionObjArgs(func, args(0).o, args(1).o, args(2).o, args(3).o, 0))
+        case 5 =>
+          z.manage(Unmanaged.PyObject_CallFunctionObjArgs(func, args(0).o, args(1).o, args(2).o, args(3).o, args(4).o, 0))
+        case 6 =>
+          z.manage(Unmanaged.PyObject_CallFunctionObjArgs(func, args(0).o, args(1).o, args(2).o, args(3).o, args(4).o, args(5).o, 0))
+        case 7 =>
+          z.manage(Unmanaged.PyObject_CallFunctionObjArgs(func, args(0).o, args(1).o, args(2).o, args(3).o, args(4).o, args(5).o, args(6).o, 0))
+        case 8 =>
+          z.manage(Unmanaged.PyObject_CallFunctionObjArgs(func, args(0).o, args(1).o, args(2).o, args(3).o, args(4).o, args(5).o, args(6).o, args(7).o, 0))
+        case 9 =>
+          z.manage(Unmanaged.PyObject_CallFunctionObjArgs(func, args(0).o, args(1).o, args(2).o, args(3).o, args(4).o, args(5).o, args(6).o, args(7).o, args(8).o, 0))
+        case 10 =>
+          z.manage(Unmanaged.PyObject_CallFunctionObjArgs(func, args(0).o, args(1).o, args(2).o, args(3).o, args(4).o, args(5).o, args(6).o, args(7).o, args(8).o, args(9).o, 0))
+        case _ =>
+          var i: Int = 0
+          val tuple = PyTuple_New(args.length)
+          args.foreach { arg =>
+            PyTuple_SetItem(tuple, i, arg.o)
+            i = i + 1
+          }
+          PyObject_CallObject(func, tuple)
       }
-      Dyn(PyObject_CallObject(func, tuple))
+      Dyn(res)
     }
 
     def applyDynamicNamed(name: String)(args: (String, Dyn)*)(implicit z: PyZone): Dyn = {
