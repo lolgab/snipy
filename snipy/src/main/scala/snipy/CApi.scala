@@ -83,7 +83,7 @@ object CApi {
   @inline def PyList_SetItem(list: PyListAny, index: CSize, element: PyObject): CInt = Unmanaged.PyList_SetItem(list, index, element)
   @inline def PyDict_New()(implicit z: PyZone): PyDictAny = z.manage(Unmanaged.PyDict_New())
   @inline def PyDict_SetItem(dict: PyDictAny, key: PyObject, value: PyObject): CInt = Unmanaged.PyDict_SetItem(dict, key, value)
-  @inline def PyDict_GetItem(dict: PyDictAny, key: PyObject)(implicit z: PyZone): PyObject = z.manage(Unmanaged.PyDict_GetItem(dict, key))
+  @inline def PyDict_GetItem(dict: PyDictAny, key: PyObject): PyObject = Unmanaged.PyDict_GetItem(dict, key)
   @inline def PyDict_Next(dict: PyDictAny, posPtr: Ptr[CSize], keysPtr: Ptr[PyObject], valuePtr: Ptr[PyObject]): CInt = Unmanaged.PyDict_Next(dict, posPtr, keysPtr, valuePtr)
   @inline def Py_DecRef(obj: PyObject): Unit = Unmanaged.Py_DecRef(obj)
 }

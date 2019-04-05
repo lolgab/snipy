@@ -77,8 +77,8 @@ package object snipy {
   private[snipy] trait _PyDictAny
   type PyDictAny = PyObject with _PyDictAny
 
-  private[snipy] trait _PyDict[A <: PyObject, B <: PyObject]
-  type PyDict[A <: PyObject, B <: PyObject] = PyDictAny with _PyDict[A, B]
+  private[snipy] trait _PyDict[K <: PyObject, V <: PyObject]
+  type PyDict[K <: PyObject, V <: PyObject] = PyDictAny with _PyDict[K, V]
 
   private[snipy] trait _PyModule
   type PyModule = PyObject with _PyModule

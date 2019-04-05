@@ -65,8 +65,7 @@ object AsScala {
 
   implicit def pyListAsScala[T <: PyObject, U](implicit asS: AsScala[T, U]): AsScala[PyList[T], Seq[U]] =
     new AsScala[PyList[T], Seq[U]] {
-      override def asScala(x: PyList[T]): Seq[U] = {
-        val list    = x.asInstanceOf[PyListAny]
+      override def asScala(list: PyList[T]): Seq[U] = {
         val length  = PyList_Size(list)
         val builder = Seq.newBuilder[U]
         var i       = 0

@@ -335,7 +335,7 @@ object AsPython {
                                                                 asPyB: AsPython[B, D]): AsPython[Map[A, B], PyDict[C, D]] =
     new AsPython[Map[A, B], PyDict[C, D]] {
       override def asPython(x: Map[A, B])(implicit z: PyZone): PyDict[C, D] = {
-        val d = PyDict_New()
+        val d = PyDict_New().asInstanceOf[PyDict[C, D]]
         for ((k, v) <- x) {
           PyDict_SetItem(d, k.asPython, v.asPython)
         }
