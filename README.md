@@ -1,4 +1,7 @@
 # SNiPY
+
+**This project was deprecated in favor of [ScalaPy](https://scalapy.dev/). Use ScalaPy instead.**
+
 Snipy is a bridge to call Python code from [Scala Native](https://scala-native.org).
 It interfaces directly with [Python C Api](https://docs.python.org/3.7/c-api/index.html) without ffi at (almost) zero cost.
 
