@@ -1,5 +1,10 @@
 target/
-.*/
-.directory
-project/target
-project/project
+.bsp/
+.metals/
+.bloop/
+.idea/
+.vscode/
+.scala-build/
+_site/
+.DS_Store
+.taste-skill/

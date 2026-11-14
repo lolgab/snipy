@@ -1,97 +1,163 @@
 package snipy
-import snipy.CApi._
 
-import scala.scalanative.native.{CDouble, CLong, CSize, stackalloc}
+import java.nio.charset.StandardCharsets.UTF_8
 
-trait AsScala[-T <: PyObject, +U] {
-  def asScala(x: T): U
+import scala.collection.mutable.ArrayBuffer
+import scala.scalanative.libc.string.memcpy
+import scala.scalanative.unsafe.*
+import scala.scalanative.unsigned.*
+
+import snipy.CApi.*
+import snipy.Python.{check, checkError, owning}
+
+/** Converts Python objects to Scala values of type `T`.
+ *
+ *  Implement [[fromPython]] to add a conversion for your own types.
+ */
+trait AsScala[T] {
+
+  /** Converts the object at `ptr`, a borrowed reference. Called with the GIL
+   *  held. Throw [[PythonException]] or any other exception on failure.
+   */
+  def fromPython(ptr: CApi.PyPtr): T
+
+  /** A conversion that maps the result of this one. */
+  final def map[U](f: T => U): AsScala[U] = p => f(fromPython(p))
 }
 
 object AsScala {
-  implicit val pyLongAsScala: AsScala[PyLong, CLong] =
-    new AsScala[PyLong, CLong] {
-      override def asScala(x: PyLong): CLong = PyLong_AsLong(x)
+  inline def apply[T](using conv: AsScala[T]): AsScala[T] = conv
+
+  given AsScala[Py] = Py.borrow(_)
+
+  given AsScala[Unit] = _ => ()
+
+  /** Python truthiness: `bool(obj)`. */
+  given AsScala[Boolean] = p => check(PyObject_IsTrue(p)) == 1
+
+  given AsScala[Long] = p => {
+    val l = PyLong_AsLongLong(p)
+    if (l == -1) checkError()
+    l
+  }
+
+  given AsScala[Int] = narrow(Int.MinValue, Int.MaxValue, "Int")(_.toInt)
+  given AsScala[Short] = narrow(Short.MinValue, Short.MaxValue, "Short")(_.toShort)
+  given AsScala[Byte] = narrow(Byte.MinValue, Byte.MaxValue, "Byte")(_.toByte)
+
+  given AsScala[Double] = p => {
+    val d = PyFloat_AsDouble(p)
+    if (d == -1.0) checkError()
+    d
+  }
+
+  given AsScala[Float] = AsScala[Double].map(_.toFloat)
+
+  /** Only accepts `str`; use `py.toString` for Python's `str(obj)`. */
+  given AsScala[String] = p => {
+    val size = stackalloc[CSSize]()
+    val utf8 = PyUnicode_AsUTF8AndSize(p, size)
+    if (utf8 == null) Python.raise()
+    val n = (!size).toInt
+    val bytes = new Array[Byte](n)
+    if (n > 0) memcpy(bytes.at(0), utf8, n.toCSize)
+    new String(bytes, UTF_8)
+  }
+
+  given AsScala[Char] = AsScala[String].map { s =>
+    if (s.length != 1)
+      throw new IllegalArgumentException(s"Expected a string of length 1, got ${s.length}")
+    s.charAt(0)
+  }
+
+  given AsScala[BigInt] = p =>
+    owning(check(PyNumber_Long(p))) { int =>
+      owning(check(PyObject_Str(int)))(digits => BigInt(AsScala[String].fromPython(digits)))
     }
 
-  implicit val pyFloatAsScala: AsScala[PyFloat, CDouble] =
-    new AsScala[PyFloat, CDouble] {
-      override def asScala(x: PyFloat): CDouble = PyFloat_AsDouble(x)
+  /** Only accepts `bytes`. */
+  given AsScala[Array[Byte]] = p => {
+    val buffer = stackalloc[CString]()
+    val size = stackalloc[CSSize]()
+    check(PyBytes_AsStringAndSize(p, buffer, size))
+    val n = (!size).toInt
+    val bytes = new Array[Byte](n)
+    if (n > 0) memcpy(bytes.at(0), !buffer, n.toCSize)
+    bytes
+  }
+
+  /** `None` becomes `None`, anything else is converted with `T`'s conversion. */
+  given [T](using conv: AsScala[T]): AsScala[Option[T]] = p =>
+    if (p == Python.None.ptr) scala.None else Some(conv.fromPython(p))
+
+  /** Accepts any iterable. */
+  given [T](using conv: AsScala[T]): AsScala[List[T]] = iterate(_).toList
+  given [T](using conv: AsScala[T]): AsScala[Vector[T]] = iterate(_).toVector
+  given [T](using conv: AsScala[T]): AsScala[Seq[T]] = iterate(_).toList
+  given [T](using conv: AsScala[T]): AsScala[Set[T]] = iterate(_).toSet
+
+  /** Accepts any mapping. */
+  given [K, V](using k: AsScala[K], v: AsScala[V]): AsScala[Map[K, V]] = p =>
+    owning(check(PyMapping_Items(p))) { items =>
+      val builder = Map.newBuilder[K, V]
+      foreach(items) { item =>
+        builder += k.fromPython(PyTuple_GetItem(item, 0)) -> v.fromPython(PyTuple_GetItem(item, 1))
+      }
+      builder.result()
     }
 
-  implicit val pyStringAsScala: AsScala[PyString, String] =
-    new AsScala[PyString, String] {
-      def asScala(s: PyString): String = {
-        val size = stackalloc[CSize]
-        val cstr = PyUnicode_AsUTF8AndSize(s, size)
-        val l    = (!size).toInt
-        val arr  = new Array[Byte](l)
-        var i    = 0
-        while (i < l) {
-          arr(i) = cstr(i)
-          i += 1
-        }
-        new String(arr)
+  /** Accepts any sequence of the right length. */
+  given [T <: Tuple](using items: TupleItems[T]): AsScala[T] = p =>
+    owning(check(PySequence_Tuple(p))) { t =>
+      val size = PyTuple_Size(t).toInt
+      if (size != items.size)
+        throw new IllegalArgumentException(s"Expected a tuple of ${items.size} elements, got $size")
+      val values = new Array[Any](size)
+      items.read(t, 0, values)
+      Tuple.fromArray(values).asInstanceOf[T]
+    }
+
+  /** Converts the elements of a Python tuple. */
+  trait TupleItems[T <: Tuple] {
+    def size: Int
+    def read(source: PyPtr, index: Int, target: Array[Any]): Unit
+  }
+
+  object TupleItems {
+    given TupleItems[EmptyTuple] with {
+      def size = 0
+      def read(source: PyPtr, index: Int, target: Array[Any]): Unit = ()
+    }
+
+    given [H, T <: Tuple](using head: AsScala[H], tail: TupleItems[T]): TupleItems[H *: T] with {
+      def size = 1 + tail.size
+      def read(source: PyPtr, index: Int, target: Array[Any]): Unit = {
+        target(index) = head.fromPython(PyTuple_GetItem(source, index))
+        tail.read(source, index + 1, target)
       }
     }
+  }
 
-  implicit val pyBoolAsBoolean: AsScala[PyBool, Boolean] =
-    new AsScala[PyBool, Boolean] {
-      override def asScala(x: PyBool): Boolean = PyZone { implicit z =>
-        if (x == true.asPython) true else false
-      }
+  private def narrow[T](min: Long, max: Long, name: String)(f: Long => T): AsScala[T] =
+    AsScala[Long].map { l =>
+      if (l < min || l > max) throw new ArithmeticException(s"$l does not fit in $name")
+      f(l)
     }
 
-  implicit def pyTuple2AsScala[T1 <: PyObject, T2 <: PyObject, U1, U2](implicit asScala1: AsScala[T1, U1],
-                                                                       asScala2: AsScala[T2, U2]): AsScala[PyTuple2[T1, T2], (U1, U2)] =
-    new AsScala[PyTuple2[T1, T2], (U1, U2)] {
-      override def asScala(x: PyTuple2[T1, T2]): (U1, U2) =
-        (PyTuple_GetItem(x, 0).asInstanceOf[T1].asScala, PyTuple_GetItem(x, 1).asInstanceOf[T2].asScala)
-    }
+  private def iterate[T](p: PyPtr)(using conv: AsScala[T]): ArrayBuffer[T] = {
+    val buffer = ArrayBuffer.empty[T]
+    foreach(p)(item => buffer += conv.fromPython(item))
+    buffer
+  }
 
-  implicit def pyTupleAsScala[T <: PyObject, U](implicit asSc: AsScala[T, U]): AsScala[PyTuple[T], Seq[U]] =
-    new AsScala[PyTuple[T], Seq[U]] {
-      override def asScala(x: PyTuple[T]): Seq[U] = {
-        val tuple   = x.asInstanceOf[PyTupleAny]
-        val length  = PyTuple_Size(tuple)
-        val builder = Seq.newBuilder[U]
-        var i       = 0
-        while (i < length) {
-          builder += PyTuple_GetItem(tuple, i).asInstanceOf[T].asScala
-          i += 1
-        }
-        builder.result()
+  /** Calls `f` with a borrowed reference to each item of the iterable `p`. */
+  private inline def foreach(p: PyPtr)(inline f: PyPtr => Unit): Unit =
+    owning(check(PyObject_GetIter(p))) { it =>
+      var item = PyIter_Next(it)
+      while (item != null) {
+        owning(item)(f)
+        item = PyIter_Next(it)
       }
-    }
-
-  implicit def pyListAsScala[T <: PyObject, U](implicit asS: AsScala[T, U]): AsScala[PyList[T], Seq[U]] =
-    new AsScala[PyList[T], Seq[U]] {
-      override def asScala(list: PyList[T]): Seq[U] = {
-        val length  = PyList_Size(list)
-        val builder = Seq.newBuilder[U]
-        var i       = 0
-        while (i < length) {
-          builder += PyList_GetItem(list, i).asInstanceOf[T].asScala
-          i += 1
-        }
-        builder.result()
-      }
-    }
-
-  implicit def pyDictAsScala[A <: PyObject, B <: PyObject, C, D](implicit asScA: AsScala[A, C],
-                                                                 asScB: AsScala[B, D]): AsScala[PyDict[A, B], Map[C, D]] =
-    new AsScala[PyDict[A, B], Map[C, D]] {
-      override def asScala(x: PyDict[A, B]): Map[C, D] = {
-        val m      = Map.newBuilder[C, D]
-        val posPtr = stackalloc[CSize]
-        !posPtr = 0
-        val keyPtr   = stackalloc[PyObject]
-        val valuePtr = stackalloc[PyObject]
-        while (PyDict_Next(x.asInstanceOf[PyDictAny], posPtr, keyPtr, valuePtr) != 0) {
-          m += (!keyPtr).asInstanceOf[A].asScala -> (!valuePtr)
-            .asInstanceOf[B]
-            .asScala
-        }
-        m.result()
-      }
+      checkError()
     }
 }

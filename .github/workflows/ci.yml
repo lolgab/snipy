@@ -1,0 +1,84 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Test (${{ matrix.os }}, Python ${{ matrix.python }}, Scala ${{ matrix.scala }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        python: ["3.12", "3.13", "3.14", "3.15"]
+        scala: ["3.3.9"]
+        include:
+          - os: ubuntu-latest
+            python: "3.15"
+            scala: "3.10.1"
+          - os: macos-latest
+            python: "3.15"
+            scala: "3.3.9"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: sbt
+      - uses: sbt/setup-sbt@v1
+      - uses: actions/setup-python@v5
+        id: python
+        with:
+          python-version: ${{ matrix.python }}
+          allow-prereleases: true
+      - name: Test
+        env:
+          SNIPY_PYTHON: ${{ steps.python.outputs.python-path }}
+        run: sbt "++${{ matrix.scala }}" snipy/testFull examples/run
+
+  gc:
+    name: Test (${{ matrix.gc }} GC)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        gc: [commix, boehm]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: sbt
+      - uses: sbt/setup-sbt@v1
+      - uses: actions/setup-python@v5
+        id: python
+        with:
+          python-version: "3.15"
+          allow-prereleases: true
+      - if: matrix.gc == 'boehm'
+        run: sudo apt-get update && sudo apt-get install -y libgc-dev
+      - name: Test
+        env:
+          SNIPY_PYTHON: ${{ steps.python.outputs.python-path }}
+        run: sbt 'set ThisBuild / nativeConfig ~= (_.withGC(scala.scalanative.build.GC.${{ matrix.gc }}))' snipy/testFull
+
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: sbt
+      - uses: sbt/setup-sbt@v1
+      - run: sbt scalafmtCheckAll scalafmtSbtCheck

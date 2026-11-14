@@ -1,50 +1,48 @@
-import scala.sys.process._
+import scala.scalanative.build._
 
-val commonSettings = Seq(
-  version := "0.0.3-SNAPSHOT",
-  organization := "com.github.lolgab",
-  scalaVersion := "2.11.12",
-  nativeLinkingOptions ++= "python3-config --ldflags".!!.split(' ').filter(_.nonEmpty).map(_.trim).toSeq,
-  libraryDependencies ++= Seq(
-    "org.scalatest" %%% "scalatest" % "3.1.0-SNAP8" % Test
-  ),
-  Test / nativeLinkStubs := true
+ThisBuild / scalaVersion := "3.3.9"
+ThisBuild / crossScalaVersions := Seq("3.3.9", "3.10.1")
+ThisBuild / organization := "com.github.lolgab"
+ThisBuild / homepage := Some(uri("https://lolgab.github.io/snipy"))
+ThisBuild / licenses := List(License.Apache2)
+ThisBuild / developers := List(
+  Developer(
+    "lolgab",
+    "Lorenzo Gabriele",
+    "lorenzolespaul@gmail.com",
+    uri("https://github.com/lolgab")
+  )
 )
+ThisBuild / scmInfo := Some(
+  ScmInfo(uri("https://github.com/lolgab/snipy"), "scm:git@github.com:lolgab/snipy.git")
+)
+
+val nativeSettings = Seq(
+  nativeConfig ~= {
+    _.withLinkingOptions(_ ++ PythonConfig.linkingOptions)
+  }
+)
+
+lazy val root = project
+  .in(file("."))
+  .aggregate(snipy, examples)
+  .settings(publish / skip := true)
 
 lazy val snipy = project
-  .settings(commonSettings)
-  .settings(publishSettings)
   .enablePlugins(ScalaNativePlugin)
+  .settings(nativeSettings)
+  .settings(
+    description := "Call Python from Scala Native through the CPython C API.",
+    scalacOptions ++= Seq("-deprecation", "-feature", "-Wunused:all"),
+    libraryDependencies += "org.scalameta" %% "munit" % "1.3.6" % Test,
+    Test / envVars ++= sys.env.get("PYTHONHOME").map("PYTHONHOME" -> _).toMap
+  )
 
 lazy val examples = project
-  .settings(commonSettings)
-  .dependsOn(snipy)
   .enablePlugins(ScalaNativePlugin)
-
-val publishSettings = Seq(
-  scmInfo := Some(
-    ScmInfo(
-      url("https://github.com/lolgab/lolgab"),
-      "scm:git@github.com:lolgab/snipy.git"
-    )
-  ),
-  developers := List(
-    Developer(
-      id    = "lolgab",
-      name  = "Lorenzo Gabriele",
-      email = "lorenzolespaul@gmail.com",
-      url   = url("http://lolgab.github.io")
-    )
-  ),
-  description := "Bridge to execute Python code from Scala Native.",
-  licenses := List("Apache 2" -> new URL("http://www.apache.org/licenses/LICENSE-2.0.txt")),
-  homepage := Some(url("https://github.com/lolgab/snipy")),
-  pomIncludeRepository := { _ => false },
-  publishTo := {
-    val nexus = "https://oss.sonatype.org/"
-    if (isSnapshot.value) Some("snapshots" at nexus + "content/repositories/snapshots")
-    else Some("releases" at nexus + "service/local/staging/deploy/maven2")
-  },
-  publishMavenStyle := true,
-  Test / skip in publish := true
-)
+  .dependsOn(snipy)
+  .settings(nativeSettings)
+  .settings(
+    publish / skip := true,
+    Compile / mainClass := Some("examples.Tour")
+  )

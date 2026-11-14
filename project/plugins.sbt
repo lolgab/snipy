@@ -1,3 +1,3 @@
-addSbtPlugin("org.scala-native" % "sbt-scala-native" % "0.3.8")
-addSbtPlugin("com.jsuereth" % "sbt-pgp" % "1.1.1")
-addSbtPlugin("org.xerial.sbt" % "sbt-sonatype" % "2.0")
+addSbtPlugin("org.scala-native" % "sbt-scala-native" % "0.5.12")
+addSbtPlugin("com.github.sbt" % "sbt-ci-release" % "1.12.1")
+addSbtPlugin("org.scalameta" % "sbt-scalafmt" % "2.6.2")
