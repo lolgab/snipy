@@ -1,93 +1,78 @@
-# SNiPY
+# snipy
 
-**This project was deprecated in favor of [ScalaPy](https://scalapy.dev/). Use ScalaPy instead.**
+[![CI](https://github.com/lolgab/snipy/actions/workflows/ci.yml/badge.svg)](https://github.com/lolgab/snipy/actions/workflows/ci.yml)
+[![Maven Central](https://img.shields.io/maven-central/v/com.github.lolgab/snipy_native0.5_3)](https://central.sonatype.com/artifact/com.github.lolgab/snipy_native0.5_3)
 
-Snipy is a bridge to call Python code from [Scala Native](https://scala-native.org).
-It interfaces directly with [Python C Api](https://docs.python.org/3.7/c-api/index.html) without ffi at (almost) zero cost.
-
-## Getting Started
-
-Add the following to your [Scala Native Project](https://scala-native.readthedocs.io/en/v0.3.8/user/sbt.html):
+Call Python from [Scala Native](https://scala-native.org). snipy embeds CPython in your binary and talks to it through the C API: no FFI layer, no subprocess, no JVM.
 
 ```scala
-import scala.sys.process._
-nativeLinkingOptions ++= "python3-config --ldflags".!!.split(' ').filter(_.nonEmpty).map(_.trim).toSeq
-libraryDependencies += "com.github.lolgab" %%% "snipy" % "0.0.2"
-```
+import snipy.*
 
-then you can call your first Python function :)
+@main def demo(): Unit = {
+  val json = module("json")
+  val text = json.dumps(Map("langs" -> List("scala", "python")), indent = 2)
+  println(text.as[String])
 
-```scala
-import snipy._         // import to enable snipy implicits
-import snipy.dynamic._ // enables dynamic interface
-
-object Main {
-  def main(args: Array[String]): Unit = PyZone { implicit z =>
-    // You need to wrap Python call in a PyZone
-    // when zone block ends every PyObject is
-    // no more usable
-    val math = module("math")  // equals to python's "import math"
-    val res = math.log10(2.0)  // calls dynamically the log10 function passing a Double converted to PyObject
-    println(res)               // calls the "str" python function as toString.
-  }
+  val byLength = (s: String) => s.length
+  val sorted = Python.builtins.sorted(List("ccc", "a", "bb"), key = byLength)
+  println(sorted.as[List[String]]) // List(a, bb, ccc)
 }
 ```
 
-## Giter8 template
-You can use the giter8 template to create an empty project:
+- **Python, written as Python.** Attributes, calls, keyword arguments and operators read as they do in Python.
+- **Checked at compile time.** Arguments are converted by a macro; a value with no conversion doesn't compile.
+- **No manual reference counting.** Python references are released by the Scala Native GC through `java.lang.ref.Cleaner`, or right away with `Py.local` and `dispose()`.
+- **Python errors are Scala exceptions** with Python's type, message and traceback.
+- **Both directions.** Pass Scala functions to Python as callbacks.
+- **Any thread.** The GIL is taken for you.
+
+Scala 3.3+, Scala Native 0.5, Python 3.12+.
+
+## Install
+
 ```scala
-sbt new lolgab/snipy.g8
+// project/plugins.sbt
+addSbtPlugin("org.scala-native" % "sbt-scala-native" % "0.5.12")
 ```
 
-## How it works
-The conversions are managed by two typeclasses:
 ```scala
-trait AsPython[T, U <: PyObject] {
-  def asPython(t: T)(implicit z: PyZone): U
-}
-```
-and
-```scala
-trait AsScala[T <: PyObject, U] {
-  def asScala(t: T): U
-}
-```
-You can implement new instances to convert directly from a Python type to a Scala Type without using default types' provided instances.
+// build.sbt
+import scala.sys.process.*
 
-## Writing facades
-You can define a hierarchy for python types this way:
-```scala
-object myfacade {
-  private[myfacade] trait _Foo
-  type Foo = PyObject with _Foo
+enablePlugins(ScalaNativePlugin)
+libraryDependencies += "com.github.lolgab" %%% "snipy" % "0.1.0" // `%%` on sbt 2
 
-  private[myfacade] trait _Bar
-  type Bar = Foo with _Bar
-```
-This way you can say that `Bar extends Foo`.
-
-You need to define a module. Not having a PyZone at facade site you can use the default leaking zone where Python objects are never freed:
-```scala
-val pythonLib = module("pythonLib")(PyZone.leakingZone)
-```
-now you can define a Scala function for every python function you need:
-```scala
-def pyFunction(foo: String): List[Int] = PyZone { implicit z =>  
-  // You can define a local PyZone because you don't
-  // need the intermediate Python Objects (result is a scala type)
-  Dyn(pythonLib).pyFunction(foo.asPython).as[PyList[PyLong]].asScala
-  // the as method casts to a specific python type 
-  // so .asScala can call the correct typeclass instance
+nativeConfig ~= { config =>
+  val python = sys.env.getOrElse("SNIPY_PYTHON", "python3")
+  def sysconfig(name: String) =
+    Seq(python, "-c", s"import sysconfig; print(sysconfig.get_config_var('$name'))").!!.trim
+  val libDir = sysconfig("LIBDIR")
+  config.withLinkingOptions(
+    _ ++ Seq(s"-L$libDir", s"-Wl,-rpath,$libDir", s"-lpython${sysconfig("LDVERSION")}")
+  )
 }
 ```
 
-Then for every class you have to define an implicit class:
-```scala
-implicit class MyPyObjectOps(val o: MyPyObject) extends AnyVal {
-  def function(): Unit = PyZone { implicit z =>
-    Dyn(o).function()
-  }
-}
+## Documentation
+
+- [Getting started](docs/getting-started.md): setup, Scala CLI, choosing the interpreter
+- [Guide](docs/guide.md): calls, conversions, operators, callbacks, exceptions, facades, threads
+- [Memory management](docs/memory.md): how Python references are released
+- [Migrating from 0.0.x](docs/migration.md)
+- [API reference](https://lolgab.github.io/snipy/api/)
+
+Or browse it all on the website: **[lolgab.github.io/snipy](https://lolgab.github.io/snipy)**.
+
+## Development
+
+```sh
+sbt snipy/test            # tests, against `python3` on the PATH
+SNIPY_PYTHON=python3.13 sbt snipy/test
+sbt examples/run          # a tour of the API
 ```
 
-Give a look to the [facades](https://github.com/lolgab/snipy/tree/master/examples/src/main/scala/facades) folder for examples.
+Releases are published to Maven Central by CI when a `v*` tag is pushed.
+
+## License
+
+[Apache 2.0](LICENSE)

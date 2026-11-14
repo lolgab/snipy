@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>snipy · Python from Scala Native</title>
+  <meta name="description" content="snipy embeds CPython in your Scala Native binary and calls it straight through the C API. No FFI layer, no subprocess, no JVM.">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://api.fontshare.com">
+  <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
+  <link href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <script>document.documentElement.classList.add("js")</script>
+</head>
+<body>
+
+<header class="bar">
+  <a class="mark" href="./">snipy</a>
+  <nav aria-label="Main">
+    <a href="docs.html#guide" class="hide-phone">Guide</a>
+    <a href="api/" class="hide-phone">API</a>
+    <a href="https://github.com/lolgab/snipy">GitHub</a>
+    <a class="button" href="docs.html#getting-started">Install snipy</a>
+  </nav>
+</header>
+
+<main>
+  <section class="hero" data-bar="paper" aria-labelledby="title">
+    <h1 class="hero-title" id="title">
+      <span class="copy above"><span class="line">Python,</span><span class="line">natively.</span></span>
+      <span class="copy below" aria-hidden="true"><span class="line">Python,</span><span class="line">natively.</span></span>
+    </h1>
+    <p class="hero-sub">snipy embeds CPython in your Scala Native binary and calls it straight through the C API. No FFI layer, no subprocess, no JVM.</p>
+  </section>
+  <div class="hero-tail" data-bar="dark" aria-hidden="true"></div>
+
+  <section class="showcase wrap" data-bar="dark" aria-labelledby="try" data-ui>
+    <h2 id="try" class="reveal">Write Scala. Run Python.</h2>
+    <label class="typer reveal" style="--i:1">
+      <span class="visually-hidden">A snipy expression</span>
+      <input id="expr" type="text" spellcheck="false" autocomplete="off" autocapitalize="off"
+             value='json.dumps(Map("a" -> List(1, 2)), indent = 2)'>
+    </label>
+    <div class="answer">
+      <div class="python reveal" style="--i:2">
+        <h3>The Python it runs</h3>
+        <pre id="py" aria-live="polite">import json
+json.dumps({"a": [1, 2]}, indent=2)</pre>
+      </div>
+      <div class="steps reveal" style="--i:3">
+        <h3>What snipy does</h3>
+        <ol id="steps">
+          <li>Converts <code>Map("a" -&gt; List(1, 2))</code> to a <code>dict</code></li>
+          <li>Passes <code>indent=2</code> as a keyword argument</li>
+          <li>Calls <code>json.dumps</code> with one vectorcall</li>
+        </ol>
+      </div>
+    </div>
+    <div class="examples reveal" style="--i:4">
+      <p>Try</p>
+      <button type="button" data-expr="math.sqrt(2).as[Double]">math.sqrt(2)</button>
+      <button type="button" data-expr='builtins.sorted(List("ccc", "a", "bb"), key = (s: String) => s.length)'>a Scala lambda as key</button>
+      <button type="button" data-expr="(Py(2) ** 100).as[BigInt]">2 ** 100</button>
+      <button type="button" data-expr='np.arange(6).reshape(2, 3).matmul(np.ones(Py.tuple(3, 2)))'>numpy matmul</button>
+    </div>
+  </section>
+
+  <section class="plate drift" data-bar="dark" aria-labelledby="seam-title">
+    <h2 id="seam-title" class="visually-hidden">Two worlds, one process</h2>
+    <figure>
+      <img class="reveal" src="assets/indian-python-python-molurus.jpg" width="1600" height="1067" loading="lazy"
+           alt="An Indian python swimming, half of its body above the water and half below.">
+      <figcaption><span>Indian python, half in the water.</span><span>Photo: Paul Asman and Jill Lenoble, CC BY-SA 3.0.</span></figcaption>
+    </figure>
+  </section>
+
+  <section class="call wrap" data-bar="surface" aria-labelledby="call-title">
+    <div class="intro">
+      <h2 id="call-title" class="reveal">One call, traced</h2>
+      <p class="reveal" style="--i:1">Every line of snipy compiles to a handful of CPython C API calls. Here is all of <code>math.sqrt(2).as[Double]</code>, as it runs in your binary.</p>
+      <p class="reveal" style="--i:2">The GIL is taken for the length of the call, so any Scala Native thread can use Python.</p>
+    </div>
+    <div class="slip reveal" style="--i:2" data-ui>
+      <p class="top">Receipt <code>math.sqrt(2)</code></p>
+      <h3>Before the call</h3>
+      <div class="row"><span>Take the GIL</span><span class="dots"></span><code>PyGILState_Ensure</code></div>
+      <div class="row"><span>Convert 2 to an int</span><span class="dots"></span><code>PyLong_FromLongLong</code></div>
+      <div class="row"><span>Look up the interned name</span><span class="dots"></span><code>"sqrt"</code></div>
+      <h3>The call</h3>
+      <div class="row"><span>Call the method, no bound object</span><span class="dots"></span><code>PyObject_VectorcallMethod</code></div>
+      <div class="row"><span>Raise if Python did</span><span class="dots"></span><code>PyErr_GetRaisedException</code></div>
+      <h3>After the call</h3>
+      <div class="row"><span>Wrap the result, register its cleaner</span><span class="dots"></span><code>Cleaner.register</code></div>
+      <div class="row"><span>Convert to Double</span><span class="dots"></span><code>PyFloat_AsDouble</code></div>
+      <div class="row"><span>Release the GIL</span><span class="dots"></span><code>PyGILState_Release</code></div>
+      <div class="total"><span>1.4142135623730951</span><span>no JVM, no FFI</span></div>
+    </div>
+  </section>
+
+  <section class="caps wrap" data-bar="dark" aria-labelledby="caps-title" data-ui>
+    <h2 id="caps-title" class="reveal">What it can do</h2>
+    <label class="reveal" style="--i:1"><span class="visually-hidden">Filter capabilities</span>
+      <input class="find" id="find" type="search" placeholder="Find a capability" autocomplete="off">
+    </label>
+    <ul id="caplist" role="listbox" aria-label="Capabilities">
+      <li role="option" aria-selected="true">
+        <button type="button">Call anything</button>
+        <div class="detail"><p>Modules, attributes, methods and keyword arguments, written the way Python writes them.</p>
+<pre><code>val np = module("numpy")
+np.linspace(0, 1, num = 5)</code></pre></div>
+      </li>
+      <li role="option" aria-selected="false">
+        <button type="button">Checked at compile time</button>
+        <div class="detail"><p>Arguments are converted by a macro. A value with no conversion is a compile error, not a crash.</p>
+<pre><code>math.sqrt(new Object)
+// error: no AsPython[Object] instance</code></pre></div>
+      </li>
+      <li role="option" aria-selected="false">
+        <button type="button">Scala lambdas as callbacks</button>
+        <div class="detail"><p>Functions of up to three arguments become Python callables, released when Python drops them.</p>
+<pre><code>builtins.sorted(words, key = (s: String) => s.length)</code></pre></div>
+      </li>
+      <li role="option" aria-selected="false">
+        <button type="button">Python errors, Scala exceptions</button>
+        <div class="detail"><p>A raised exception becomes <code>PythonException</code>, with Python's type, message and traceback.</p>
+<pre><code>catch case e: PythonException =>
+  e.pythonType // json.decoder.JSONDecodeError</code></pre></div>
+      </li>
+      <li role="option" aria-selected="false">
+        <button type="button">No manual refcounting</button>
+        <div class="detail"><p>The Scala Native GC releases references through <code>java.lang.ref.Cleaner</code>. <code>Py.local</code> releases them on the spot.</p>
+<pre><code>Py.local {
+  np.random.rand(1000, 1000).sum().as[Double]
+}</code></pre></div>
+      </li>
+      <li role="option" aria-selected="false">
+        <button type="button">Any thread</button>
+        <div class="detail"><p>The GIL is taken around every operation, and blocking calls never stall the garbage collector.</p>
+<pre><code>Python.withGil {
+  (1 to 1000).map(Py(_)).reduce(_ + _)
+}</code></pre></div>
+      </li>
+      <li role="option" aria-selected="false">
+        <button type="button">Typed facades</button>
+        <div class="detail"><p>An opaque type over <code>Py</code> gives a Python class a Scala type, with no wrapper allocated.</p>
+<pre><code>opaque type Fraction = Py
+extension (f: Fraction) def +(g: Fraction): Fraction = ...</code></pre></div>
+      </li>
+      <li role="option" aria-selected="false">
+        <button type="button">Conversions both ways</button>
+        <div class="detail"><p>Numbers, BigInt, strings, bytes, options, collections and tuples of any size, plus your own types.</p>
+<pre><code>json.loads(text).as[Map[String, List[(Int, String)]]]</code></pre></div>
+      </li>
+    </ul>
+    <p class="none" id="none" hidden>Nothing matches. The <a href="docs.html#guide">guide</a> has everything.</p>
+  </section>
+
+  <section class="memory wrap" data-bar="paper" aria-labelledby="memory-title">
+    <figure class="reveal">
+      <img src="assets/a-female-python-guarding-her-eggs-wood.jpg" width="1400" height="994" loading="lazy"
+           alt="Wood engraving of a python coiled around a clutch of eggs.">
+      <figcaption>A female python guarding her eggs. Wood engraving, about 1850. Wellcome Collection.</figcaption>
+    </figure>
+    <div class="text">
+      <h2 id="memory-title" class="reveal">No refcounting by hand</h2>
+      <p class="statement reveal" style="--i:1">Each Python object stays alive exactly as long as a Scala value points at it.</p>
+      <p class="reveal" style="--i:2">snipy registers every object with Scala Native's <code>java.lang.ref.Cleaner</code>. When the garbage collector drops the Scala side, the Python reference is released, under the GIL, on the next call. For loops that make big arrays, <code>Py.local</code> and <code>dispose()</code> release them on the spot.</p>
+      <p class="reveal" style="--i:3"><a href="docs.html#memory">How memory is managed</a></p>
+    </div>
+  </section>
+
+  <section class="proof wrap" data-bar="dark" aria-labelledby="proof-title">
+    <h2 id="proof-title" class="reveal">Tested on every push</h2>
+    <p class="sentence reveal" style="--i:1" id="tested">Against <b>Python 3.12</b>, <b>3.13</b>, <b>3.14</b> and <b>3.15</b>, <b>Scala 3.3 LTS</b> and <b>3.10</b>, <b>Scala Native 0.5.12</b>, on <b>Linux</b> and <b>macOS</b>. The test suite also runs under the <b>immix</b>, <b>commix</b> and <b>Boehm</b> collectors.</p>
+    <figure class="reveal" style="--i:2">
+      <img src="assets/eight-snakes-including-a-reticulated-python-a.jpg" width="1400" height="937" loading="lazy"
+           alt="An eighteenth-century engraved plate of eight snakes, including a reticulated python.">
+      <figcaption>Eight snakes, including a reticulated python. Engraving, about 1778. Wellcome Collection.</figcaption>
+    </figure>
+  </section>
+
+  <section class="install wrap" data-bar="surface" aria-labelledby="install-title">
+    <div class="text">
+      <h2 id="install-title" class="reveal">Add it to your build</h2>
+      <p class="reveal" style="--i:1">One dependency and one linker setting that finds <code>libpython</code>. The interpreter starts the first time you touch a Python object.</p>
+<pre class="reveal" style="--i:2"><code>libraryDependencies += "com.github.lolgab" %%% "snipy" % "0.1.0"
+
+nativeConfig ~= { config =>
+  val python = sys.env.getOrElse("SNIPY_PYTHON", "python3")
+  def sysconfig(name: String) =
+    Seq(python, "-c", s"import sysconfig; print(sysconfig.get_config_var('$name'))").!!.trim
+  val libDir = sysconfig("LIBDIR")
+  config.withLinkingOptions(
+    _ ++ Seq(s"-L$libDir", s"-Wl,-rpath,$libDir", s"-lpython${sysconfig("LDVERSION")}")
+  )
+}</code></pre>
+      <div class="reqs reveal" style="--i:3">
+        <p><b>Scala</b> 3.3 or newer</p>
+        <p><b>Scala Native</b> 0.5</p>
+        <p><b>Python</b> 3.12 or newer</p>
+      </div>
+    </div>
+    <figure class="reveal" style="--i:2">
+      <img src="assets/spiral-staircase-in-the-vatican-museums-from.jpg" width="1600" height="1067" loading="lazy"
+           alt="Looking up a spiral staircase towards an octagonal skylight.">
+      <figcaption>Spiral staircase, Vatican Museums. Scala's logo is drawn from a staircase too, at EPFL. Photo: Wilfredor.</figcaption>
+    </figure>
+  </section>
+
+  <a class="band" href="docs.html#getting-started" data-bar="accent">
+    <span class="what">The getting-started guide: one dependency, one linker setting, your first call.</span>
+    <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M12 36 36 12M16 12h20v20" fill="none" stroke="currentColor" stroke-width="4"/></svg>
+    <span class="word">Start</span>
+  </a>
+</main>
+
+<footer class="footer" data-bar="paper">
+  <div class="cols">
+    <ul><li>Docs</li><li><a href="docs.html#getting-started">Getting started</a></li><li><a href="docs.html#guide">Guide</a></li><li><a href="docs.html#memory">Memory</a></li><li><a href="docs.html#migration">Migrating from 0.0.x</a></li></ul>
+    <ul><li>Reference</li><li><a href="api/">API</a></li><li><a href="docs.html#changelog">Changelog</a></li><li><a href="https://central.sonatype.com/artifact/com.github.lolgab/snipy_native0.5_3">Maven Central</a></li></ul>
+    <ul><li>Project</li><li><a href="https://github.com/lolgab/snipy">GitHub</a></li><li><a href="https://github.com/lolgab/snipy/issues">Issues</a></li><li><a href="https://github.com/lolgab/snipy/blob/master/LICENSE">Apache 2.0</a></li></ul>
+    <ul><li>Built on</li><li><a href="https://scala-native.org">Scala Native</a></li><li><a href="https://docs.python.org/3/c-api/">The Python C API</a></li><li><a href="https://scala-lang.org">Scala 3</a></li></ul>
+    <p class="credits">Pictures: <a href="https://commons.wikimedia.org/wiki/File:A_female_python_guarding_her_eggs._Wood_engraving,_ca._1850._Wellcome_V0022817.jpg">“A female python guarding her eggs. Wood engraving, ca. 1850.”</a>, <a href="https://creativecommons.org/licenses/by/4.0">CC BY 4.0</a>, via Wikimedia Commons; <a href="https://commons.wikimedia.org/wiki/File:Eight_snakes,_including_a_reticulated_python,_a_slow_worm,_a_Wellcome_V0022736.jpg">“Eight snakes, including a reticulated python, a slow worm…”</a>, <a href="https://creativecommons.org/licenses/by/4.0">CC BY 4.0</a>, via Wikimedia Commons; <a href="https://commons.wikimedia.org/wiki/File:Spiral_staircase_in_the_Vatican_Museums_from_bottom_02.jpg">“Spiral staircase in the Vatican Museums from bottom 02”</a> by Wilfredor, <a href="https://creativecommons.org/publicdomain/zero/1.0/deed.en">CC0</a>, via Wikimedia Commons; <a href="https://commons.wikimedia.org/w/index.php?curid=4872067">“Indian python Python molurus”</a> by Paul Asman and Jill Lenoble, <a href="https://creativecommons.org/licenses/by-sa/3.0/">CC BY-SA 3.0</a>, via Wikimedia Commons.</p>
+  </div>
+  <div></div>
+  <div>
+    <svg class="wordmark" viewBox="0 0 1000 300" role="img" aria-label="snipy"><text x="-14" y="238" font-family="General Sans, sans-serif" font-weight="700" font-size="352" letter-spacing="-18" textLength="1010" lengthAdjust="spacingAndGlyphs">snipy</text></svg>
+    <p class="legal">© Lorenzo Gabriele and contributors. Released under the Apache License 2.0.</p>
+  </div>
+</footer>
+
+<script src="main.js"></script>
+</body>
+</html>
