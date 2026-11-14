@@ -27,14 +27,14 @@ jobs:
             python: "3.15"
             scala: "3.3.9"
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 21
           cache: sbt
       - uses: sbt/setup-sbt@v1
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         id: python
         with:
           python-version: ${{ matrix.python }}
@@ -42,7 +42,7 @@ jobs:
       - name: Test
         env:
           SNIPY_PYTHON: ${{ steps.python.outputs.python-path }}
-        run: sbt "++${{ matrix.scala }}" snipy/testFull examples/run
+        run: sbt "++${{ matrix.scala }}; snipy/testFull; examples/run"
 
   gc:
     name: Test (${{ matrix.gc }} GC)
@@ -52,14 +52,14 @@ jobs:
       matrix:
         gc: [commix, boehm]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 21
           cache: sbt
       - uses: sbt/setup-sbt@v1
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         id: python
         with:
           python-version: "3.15"
@@ -69,16 +69,16 @@ jobs:
       - name: Test
         env:
           SNIPY_PYTHON: ${{ steps.python.outputs.python-path }}
-        run: sbt 'set ThisBuild / nativeConfig ~= (_.withGC(scala.scalanative.build.GC.${{ matrix.gc }}))' snipy/testFull
+        run: sbt 'set ThisBuild / nativeConfig ~= (_.withGC(scala.scalanative.build.GC.${{ matrix.gc }})); snipy/testFull'
 
   format:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 21
           cache: sbt
       - uses: sbt/setup-sbt@v1
-      - run: sbt scalafmtCheckAll scalafmtSbtCheck
+      - run: sbt "scalafmtCheckAll; scalafmtSbtCheck"
